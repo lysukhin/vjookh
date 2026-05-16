@@ -1,0 +1,69 @@
+name: vjookh
+options:
+  bundleIdPrefix: io.github.vjookh
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+
+targets:
+  Core:
+    type: framework
+    platform: macOS
+    sources:
+      - path: Sources/Core
+        excludes: ["**/.DS_Store"]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.vjookh.Core
+        GENERATE_INFOPLIST_FILE: true
+
+  vjookh:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/App
+      - Sources/System
+      - Sources/Support
+    dependencies:
+      - target: Core
+    info:
+      path: Sources/App/Info.plist
+      properties:
+        CFBundleDisplayName: vjookh
+        LSUIElement: true   # menu-bar agent, no Dock icon
+        NSAppleEventsUsageDescription: vjookh needs to observe typing to fix wrong-layout text.
+    entitlements:
+      path: Sources/App/vjookh.entitlements
+      properties:
+        com.apple.security.app-sandbox: false   # CGEventTap is incompatible with the sandbox
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.vjookh.app
+        # Stable local identity → designated requirement is identifier+cert
+        # (constant across rebuilds) instead of the volatile ad-hoc cdhash,
+        # so the TCC Accessibility grant survives every rebuild.
+        CODE_SIGN_IDENTITY: "vjookh Dev"
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGNING_REQUIRED: "YES"
+        CODE_SIGN_INJECT_BASE_ENTITLEMENTS: "NO"
+
+  CoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/CoreTests
+    dependencies:
+      - target: Core
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.vjookh.CoreTests
+
+schemes:
+  vjookh:
+    build:
+      targets:
+        vjookh: all
+        CoreTests: [test]
+    test:
+      targets: [CoreTests]
