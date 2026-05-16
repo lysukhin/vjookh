@@ -33,8 +33,12 @@ map is JSON-driven and extensible).
 
 - `Sources/Core` — pure logic, NO system APIs, fully TDD'd: `LayoutMap`, `Lexicon` (hunspell
   `.dic` reader; named Lexicon to avoid stdlib clash), `Detector`, `KeystrokeBuffer`,
-  `EventClassifier`, `InputSourceSelector`, `EditPlanner`, `ShiftDoubleTapDetector`. Add
-  tests here first.
+  `EventClassifier`, `InputSourceSelector`, `EditPlanner`, `ShiftDoubleTapDetector`,
+  `Plausibility` (vowel-structure heuristic). Add tests here first.
+- Detector asymmetry (intentional): RU-typed-in-EN is caught by dictionary
+  cross-check AND a medium-confidence no-Latin-vowel heuristic; EN-typed-in-RU
+  has no reliable structural signal so it stays dictionary-only. Don't add a
+  symmetric heuristic — it causes false positives.
 - `Sources/System` — thin macOS adapters, manually integration-tested (cannot be
   self-verified — CGEventTap/TIS need the user to run the app & report).
 - `Sources/App` — `AppDelegate` (menu-bar agent) + `CorrectionPipeline`.

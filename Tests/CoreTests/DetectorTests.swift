@@ -34,6 +34,23 @@ final class DetectorTests: XCTestCase {
         XCTAssertFalse(d.evaluate(token: "xyzzy", activeLayout: .latin).shouldConvert)
     }
 
+    // Inflected RU word typed in EN layout, NOT in the (stems-only) RU lexicon
+    // and NOT a real EN word: the dictionary cross-check misses it, but its
+    // Latin form has no vowels while its Cyrillic form does → medium confidence.
+    func test_inflectedWrongLayout_notInDicts_isMediumConfidence() throws {
+        let d = try makeDetector()
+        let decision = d.evaluate(token: "ghbdtnjv", activeLayout: .latin)  // приветом
+        XCTAssertTrue(decision.shouldConvert)
+        XCTAssertEqual(decision.confidence, .medium)
+    }
+
+    // Real English not in the small test lexicon must still NOT convert —
+    // it looks like plausible Latin, so the heuristic stays silent.
+    func test_unknownButPlausibleEnglish_isNotConverted() throws {
+        let d = try makeDetector()
+        XCTAssertFalse(d.evaluate(token: "blockchain", activeLayout: .latin).shouldConvert)
+    }
+
     // Tokens with digits, or too short, are never auto-converted (high false-positive risk).
     func test_digitsAndVeryShortTokens_areNotConverted() throws {
         let d = try makeDetector()

@@ -37,13 +37,24 @@ public struct Detector {
         // transliteration IS a word in the other language → high confidence.
         switch activeLayout {
         case .latin:
-            if !latin.contains(core), cyrillic.contains(map.toCyrillic(core)) {
+            if latin.contains(core) { break }            // valid English → leave alone
+            if cyrillic.contains(map.toCyrillic(core)) {
                 return Decision(shouldConvert: true, confidence: .high, reason: "dictionary")
+            }
+            // Stems-only lexicons miss inflected forms. If the Latin token is
+            // implausible English (no vowels — the reliable signal) but its
+            // Cyrillic mapping is plausible Russian, convert at medium conf.
+            if !Plausibility.looksLikeLatin(core),
+               Plausibility.looksLikeCyrillic(map.toCyrillic(core)) {
+                return Decision(shouldConvert: true, confidence: .medium, reason: "heuristic")
             }
         case .cyrillic:
-            if !cyrillic.contains(core), latin.contains(map.toLatin(core)) {
+            if cyrillic.contains(core) { break }
+            if latin.contains(map.toLatin(core)) {
                 return Decision(shouldConvert: true, confidence: .high, reason: "dictionary")
             }
+            // Reverse direction has no reliable structural signal (see
+            // Plausibility doc) — stays dictionary-only by design.
         }
 
         return Decision(shouldConvert: false, confidence: .none, reason: "no-signal")

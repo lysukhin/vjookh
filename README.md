@@ -25,11 +25,16 @@ deliberately minimal and local:
 
 - The app runs as a menu-bar agent (no Dock icon).
 - Wrong-layout words are auto-corrected as you finish them (Space, Tab,
-  Return, or punctuation commits a word).
+  Return, or punctuation commits a word). Detection is a dictionary
+  cross-check plus a conservative vowel-structure heuristic that catches
+  inflected Russian-in-EN-layout words the stems-only wordlist misses.
 - **Double-tap ⇧ Shift** to fix the last word manually: if it was
   auto-corrected, that reverts it; if it was left alone, this converts it.
   Repeat to flip back and forth. (Only works while the engine is enabled.)
-- The menu-bar item toggles the engine on/off.
+- The menu-bar item provides: enable/disable, ignore the current frontmost
+  app (per-app exclusion), and launch-at-login.
+- On first launch, grant Accessibility when prompted — the engine starts
+  automatically once the grant lands; no relaunch needed.
 
 ## Permissions
 

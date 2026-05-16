@@ -1,23 +1,34 @@
 import AppKit
 import Core
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private var tap: EventTapController?
     private var pipeline: CorrectionPipeline?
+    private var permissionTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setUpMenuBar()
 
-        guard PermissionsManager.requestIfNeeded() else {
-            // Not trusted yet — user must grant, then relaunch.
+        if PermissionsManager.requestIfNeeded() {
+            startEngine()
+        } else {
             notifyPermissionNeeded()
-            return
+            // Onboarding without relaunch: poll until the grant lands, then
+            // start the engine automatically.
+            permissionTimer = Timer.scheduledTimer(
+                withTimeInterval: 1.0, repeats: true
+            ) { [weak self] _ in
+                guard PermissionsManager.isTrusted else { return }
+                self?.permissionTimer?.invalidate()
+                self?.permissionTimer = nil
+                self?.startEngine()
+            }
         }
-        startEngine()
     }
 
     private func startEngine() {
+        guard tap == nil else { return }  // idempotent (timer + relaunch safety)
         guard let map = try? LayoutMap.load(pair: "en-ru"),
               let en = try? Lexicon.load(name: "en"),
               let ru = try? Lexicon.load(name: "ru") else {
@@ -39,33 +50,82 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.tap = tap
     }
 
+    // MARK: Menu
+
     private func setUpMenuBar() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.title = "⌨︎"
         let menu = NSMenu()
-        let toggle = NSMenuItem(
-            title: "Enabled", action: #selector(toggleEnabled), keyEquivalent: ""
-        )
-        toggle.target = self
-        toggle.state = Settings.shared.isEnabled ? .on : .off
-        menu.addItem(toggle)
+        menu.delegate = self  // rebuilt on open so dynamic items stay current
+        item.menu = menu
+        statusItem = item
+    }
+
+    /// Rebuilt every time the menu opens so the per-app exclusion and
+    /// launch-at-login states reflect reality.
+    func menuWillOpen(_ menu: NSMenu) {
+        menu.removeAllItems()
+
+        let enabled = menuItem("Enabled", #selector(toggleEnabled),
+                               on: Settings.shared.isEnabled)
+        menu.addItem(enabled)
+
+        if let app = NSWorkspace.shared.frontmostApplication,
+           let bid = app.bundleIdentifier {
+            let name = app.localizedName ?? bid
+            let excluded = Settings.shared.isExcluded(bid)
+            let mi = menuItem(
+                "Ignore “\(name)”", #selector(toggleExcludeFrontmost), on: excluded
+            )
+            mi.representedObject = bid
+            menu.addItem(mi)
+        }
+
+        menu.addItem(menuItem("Launch at Login", #selector(toggleLogin),
+                              on: LoginItem.isEnabled))
+
         menu.addItem(.separator())
         let hint = NSMenuItem(
             title: "Double-tap ⇧ Shift — fix last word", action: nil, keyEquivalent: ""
         )
         hint.isEnabled = false
         menu.addItem(hint)
+
+        if !PermissionsManager.isTrusted {
+            let warn = NSMenuItem(
+                title: "⚠︎ Grant Accessibility…",
+                action: #selector(openAccessibility), keyEquivalent: ""
+            )
+            warn.target = self
+            menu.addItem(warn)
+        }
+
         menu.addItem(.separator())
         let quit = NSMenuItem(title: "Quit vjookh", action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         menu.addItem(quit)
-        item.menu = menu
-        statusItem = item
     }
 
-    @objc private func toggleEnabled(_ sender: NSMenuItem) {
-        Settings.shared.isEnabled.toggle()
-        sender.state = Settings.shared.isEnabled ? .on : .off
+    private func menuItem(_ title: String, _ sel: Selector, on: Bool) -> NSMenuItem {
+        let mi = NSMenuItem(title: title, action: sel, keyEquivalent: "")
+        mi.target = self
+        mi.state = on ? .on : .off
+        return mi
+    }
+
+    @objc private func toggleEnabled() { Settings.shared.isEnabled.toggle() }
+
+    @objc private func toggleExcludeFrontmost(_ sender: NSMenuItem) {
+        guard let bid = sender.representedObject as? String else { return }
+        var set = Settings.shared.excludedBundleIDs
+        if set.contains(bid) { set.remove(bid) } else { set.insert(bid) }
+        Settings.shared.excludedBundleIDs = set
+    }
+
+    @objc private func toggleLogin() { LoginItem.setEnabled(!LoginItem.isEnabled) }
+
+    @objc private func openAccessibility() {
+        PermissionsManager.openAccessibilitySettings()
     }
 
     @objc private func quit() { NSApp.terminate(nil) }
@@ -75,7 +135,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.messageText = "Accessibility permission required"
         alert.informativeText =
             "Grant vjookh access in System Settings → Privacy & Security → "
-            + "Accessibility, then relaunch."
+            + "Accessibility. vjookh starts automatically once granted — no "
+            + "relaunch needed."
         alert.addButton(withTitle: "Open Settings")
         alert.addButton(withTitle: "Later")
         if alert.runModal() == .alertFirstButtonReturn {
