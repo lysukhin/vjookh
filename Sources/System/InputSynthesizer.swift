@@ -16,25 +16,33 @@ public final class InputSynthesizer {
 
     public init() {}
 
-    /// Execute a planned edit (delete N, then type the replacement).
-    public func apply(_ edit: EditPlanner.Edit) {
-        replace(deleteCount: edit.deleteCount, with: edit.insert)
+    /// Execute a planned edit (delete N, then type the replacement). The
+    /// `completion` runs on the synth queue after the last event is posted —
+    /// the caller uses it to sequence the layout switch *after* the keystrokes
+    /// instead of racing them.
+    public func apply(_ edit: EditPlanner.Edit, completion: (() -> Void)? = nil) {
+        replace(deleteCount: edit.deleteCount, with: edit.insert, completion: completion)
     }
 
-    /// Delete `deleteCount` characters, then type `replacement`.
-    /// Both halves are tagged; a tiny inter-event delay lets the target app
-    /// keep up (fast apps drop coalesced synthetic events otherwise).
-    public func replace(deleteCount: Int, with replacement: String) {
+    /// Delete `deleteCount` graphemes, then type `replacement`. Typed one event
+    /// per `Character` (grapheme cluster), so a single backspace reverses a
+    /// single typed unit and the count matches `EditPlanner`'s grapheme-based
+    /// `deleteCount`. Both halves are tagged; a tiny inter-event delay lets the
+    /// target app keep up (fast apps drop coalesced synthetic events otherwise).
+    public func replace(
+        deleteCount: Int, with replacement: String, completion: (() -> Void)? = nil
+    ) {
         queue.async { [self] in
             for _ in 0..<deleteCount {
                 postKey(backspaceKey, down: true)
                 postKey(backspaceKey, down: false)
                 usleep(1_500)
             }
-            for scalar in replacement.unicodeScalars {
-                postUnicode(scalar)
+            for character in replacement {
+                postCharacter(character)
                 usleep(1_500)
             }
+            completion?()
         }
     }
 
@@ -48,11 +56,14 @@ public final class InputSynthesizer {
         event?.post(tap: .cgSessionEventTap)
     }
 
-    private func postUnicode(_ scalar: Unicode.Scalar) {
+    /// Post one grapheme cluster as a single keyboard event pair. Multi-scalar
+    /// clusters (combining marks, ZWJ sequences) are delivered atomically so
+    /// the field treats them as one deletable unit.
+    private func postCharacter(_ character: Character) {
         guard let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
               let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
         else { return }
-        var utf16 = Array(String(scalar).utf16)
+        var utf16 = Array(String(character).utf16)
         down.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: &utf16)
         up.keyboardSetUnicodeString(stringLength: utf16.count, unicodeString: &utf16)
         tag(down); tag(up)

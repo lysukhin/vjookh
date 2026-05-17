@@ -28,6 +28,8 @@ map is JSON-driven and extensible).
   by `scripts/setup-dev-signing.sh`) fixes this; it is wired in `project.yml`
   (`CODE_SIGN_IDENTITY`).
 - Clear stale grants: `tccutil reset Accessibility io.github.vjookh.app`.
+- The update-signing private key (`privkey.pem`) lives OUTSIDE the repo and is
+  never tracked — `*.pem` is gitignored. Don't add it back.
 
 ## Architecture
 

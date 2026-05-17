@@ -25,6 +25,7 @@ public final class EventTapController {
 
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    private var runLoop: CFRunLoop?   // the tap thread's run loop
     private var thread: Thread?
     private let onKeystroke: (Keystroke) -> Void
     private let onShift: (Bool) -> Void   // true = Shift went down, false = up
@@ -59,6 +60,7 @@ public final class EventTapController {
             self.tap = tap
             let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
             self.runLoopSource = source
+            self.runLoop = CFRunLoopGetCurrent()
             CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
             CGEvent.tapEnable(tap: tap, enable: true)
             CFRunLoopRun()
@@ -68,11 +70,24 @@ public final class EventTapController {
         self.thread = thread
     }
 
+    /// Tear down the tap on the *tap thread's* run loop (the source was added
+    /// there, not on the caller's run loop) and stop that run loop so the
+    /// thread exits instead of leaking.
     public func stop() {
+        guard let runLoop else { return }   // not started / already stopped
         if let tap { CGEvent.tapEnable(tap: tap, enable: false) }
-        if let runLoopSource {
-            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
+        let source = runLoopSource
+        CFRunLoopPerformBlock(runLoop, CFRunLoopMode.commonModes.rawValue) {
+            if let source {
+                CFRunLoopRemoveSource(runLoop, source, .commonModes)
+            }
+            CFRunLoopStop(runLoop)
         }
+        CFRunLoopWakeUp(runLoop)
+        self.tap = nil
+        self.runLoopSource = nil
+        self.runLoop = nil
+        self.thread = nil
     }
 
     private static func handle(
