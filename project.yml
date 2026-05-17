@@ -39,6 +39,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.vjookh.app
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Stable local identity → designated requirement is identifier+cert
         # (constant across rebuilds) instead of the volatile ad-hoc cdhash,
         # so the TCC Accessibility grant survives every rebuild.
