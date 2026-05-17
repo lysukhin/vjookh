@@ -8,6 +8,10 @@ DerivedData/
 # macOS
 .DS_Store
 
+# Brainstorm / browser-tooling scratch
+.superpowers/
+.playwright-mcp/
+
 # Xcode user state
 xcuserdata/
 *.xcuserstate

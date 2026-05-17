@@ -54,7 +54,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func setUpMenuBar() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "⌨︎"
+        if let icon = NSImage(named: "StatusIcon") {
+            icon.isTemplate = true  // let macOS tint for light/dark menu bars
+            icon.size = NSSize(width: 18, height: 18)
+            item.button?.image = icon
+        } else {
+            item.button?.title = "⌨︎"  // fallback if the asset is missing
+        }
         let menu = NSMenu()
         menu.delegate = self  // rebuilt on open so dynamic items stay current
         item.menu = menu
