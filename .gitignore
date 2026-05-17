@@ -11,3 +11,7 @@ DerivedData/
 # Xcode user state
 xcuserdata/
 *.xcuserstate
+
+# Update signing key — never commit (lives outside the repo)
+privkey.pem
+*.pem
