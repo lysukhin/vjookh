@@ -7,7 +7,7 @@
 **Type in the wrong layout? *вжух* — it's fixed.**
 
 An open-source macOS keyboard-layout fixer, in the spirit of the classic
-**Punto Switcher** and the modern **Lang Switcher**.
+**Punto Switcher**.
 
 [![macOS 13+](https://img.shields.io/badge/macOS-13%2B-000000?logo=apple&logoColor=white)](#building-from-source)
 [![Swift](https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white)](#architecture)
